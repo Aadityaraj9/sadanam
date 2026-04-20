@@ -1,0 +1,37 @@
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+students = {}
+student_id = 1
+
+@app.route('/students', methods=['POST'])
+def add_student():
+    global student_id
+    data = request.get_json()
+    student = {'id': student_id, 'name': data['name'], 'roll': data['roll']}
+    students[student_id] = student
+    student_id += 1
+    return jsonify(student), 201
+
+@app.route('/students', methods=['GET'])
+def get_students():
+    return jsonify(list(students.values()))
+
+@app.route('/students/<int:id>', methods=['DELETE'])
+def delete_student(id):
+    students.pop(id, None)
+    return jsonify({'message': 'Deleted'})
+
+if __name__ == '__main__':
+    app.run(debug=True, host='127.0.0.1', port=5000)
+
+
+
+# Add student
+curl.exe -X POST http://127.0.0.1:5000/students -H "Content-Type: application/json" -d "{\"name\":\"Alice\",\"roll\":\"CS001\"}"
+
+# Get all students
+curl.exe -X GET http://127.0.0.1:5000/students
+
+# Delete student (if ID exists)
+curl.exe -X DELETE http://127.0.0.1:5000/students/1
