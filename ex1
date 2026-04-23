@@ -1,0 +1,142 @@
+print("Q1: Display the number of rows and number of columns")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Read the data
+df = pd.read_csv("Stores1a.csv")
+print("Number of rows:", df.shape[0])
+print("Number of columns:", df.shape[1])
+
+--------------------------------------------------------------------------------------------
+
+print("\nQ2: Display the number of categorical and number of numerical columns")
+print("Regno: URK23CS1010")
+
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+cat_cols = df.select_dtypes(include=['object']).columns.tolist()
+
+print("Number of numerical columns:", len(num_cols))
+print("Numerical columns:", num_cols)
+print("\nNumber of categorical columns:", len(cat_cols))
+print("Categorical columns:", cat_cols)
+
+
+------------------------------------------------------------------------------------------------
+
+print("\nQ3: For all numerical columns, display the min, max and mean")
+print("Regno: URK23CS1010")
+
+num_cols = df.select_dtypes(include=[np.number]).columns
+for col in num_cols:
+    print(f"\nColumn: {col}")
+    print(f"Min: {df[col].min()}")
+    print(f"Max: {df[col].max()}")
+    print(f"Mean: {df[col].mean():.2f}")
+
+-------------------------------------------------------------------------------------------------
+
+print("\nQ4: Calculate the 5 number summary for 'Age' column and correlate with box plot")
+print("Regno: URK23CS1010")
+
+# 5 number summary
+min_val = df['Age'].min()
+q1 = df['Age'].quantile(0.25)
+median = df['Age'].median()
+q3 = df['Age'].quantile(0.75)
+max_val = df['Age'].max()
+
+print("5 Number Summary for Age:")
+print(f"Minimum: {min_val}")
+print(f"Q1: {q1}")
+print(f"Median: {median}")
+print(f"Q3: {q3}")
+print(f"Maximum: {max_val}")
+
+# Box plot
+plt.figure(figsize=(8, 4))
+plt.boxplot(df['Age'])
+plt.title('Box Plot of Age')
+plt.ylabel('Age')
+plt.show()
+
+-----------------------------------------------------------------------------------------------------
+
+print("\nQ5: Display the row index along with outlier values for the column 'Quantity' using IQR")
+print("Regno: URK23CS1010")
+
+# Calculate IQR
+Q1 = df['Quantity'].quantile(0.25)
+Q3 = df['Quantity'].quantile(0.75)
+IQR = Q3 - Q1
+
+# Define outlier bounds
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+# Find outliers
+outliers = df[(df['Quantity'] < lower_bound) | (df['Quantity'] > upper_bound)]
+print("Row indices and outlier values for Quantity:")
+for idx in outliers.index:
+    print(f"Row {idx}: {df.loc[idx, 'Quantity']}")
+
+# Box plot to verify
+plt.figure(figsize=(8, 4))
+plt.boxplot(df['Quantity'])
+plt.title('Box Plot of Quantity with Outliers')
+plt.ylabel('Quantity')
+plt.show()
+
+---------------------------------------------------------------------------------------------------
+
+print("\nQ6: Display the row index along with outlier values and Z-score for the column 'Quantity'")
+print("Regno: URK23CS1010")
+
+from scipy import stats
+
+# Calculate Z-scores
+z_scores = np.abs(stats.zscore(df['Quantity'].dropna()))
+threshold = 3
+
+# Find outliers using Z-score
+outlier_indices = np.where(z_scores > threshold)[0]
+print("Row indices, outlier values, and Z-scores for Quantity:")
+for idx in outlier_indices:
+    actual_idx = df.index[idx]
+    print(f"Row {actual_idx}: Value={df.loc[actual_idx, 'Quantity']}, Z-score={z_scores[idx]:.2f}")
+
+# Box plot to verify
+plt.figure(figsize=(8, 4))
+plt.boxplot(df['Quantity'])
+plt.title('Box Plot of Quantity with Outliers (Z-score method)')
+plt.ylabel('Quantity')
+plt.show()
+
+
+---------------------------------------------------------------------------------------------
+
+print("\nQ7: Find the correlation for the input features 'Age', 'Price', 'Tax', 'Quarterly_Tax', 'Rating'")
+print("Regno: URK23CS1010")
+
+features = ['Age', 'Price', 'Tax', 'Quarterly_Tax', 'Rating']
+correlation_matrix = df[features].corr()
+
+print("Correlation Matrix:")
+print(correlation_matrix)
+
+# Heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', center=0)
+plt.title('Correlation Heatmap')
+plt.show()
+
+---------------------------------------------------------------------------------------------
+
+
+
+-----------------------------------------------------------------------------------------------
+
+
