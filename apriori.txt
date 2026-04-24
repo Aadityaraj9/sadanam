@@ -1,0 +1,267 @@
+# Question 7 - Iris Data Analysis + Apriori Algorithm
+print("QUESTION 7")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import itertools
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# PART 1: IRIS DATASET ANALYSIS
+# ============================================================
+print("\n" + "="*50)
+print("PART 1: Iris Dataset Analysis")
+print("="*50)
+
+# Load iris dataset
+df_iris = pd.read_csv("B5_iris_regression.csv")
+print("Shape:", df_iris.shape)
+print("\nFirst 5 rows:")
+print(df_iris.head())
+
+# ============================================================
+# (i) Missing Values %
+# ============================================================
+print("\n" + "-"*40)
+print("(i) Missing Values Analysis")
+print("-"*40)
+
+print("Missing value percentages:")
+for col in df_iris.columns:
+    null_pct = (df_iris[col].isnull().sum() / len(df_iris)) * 100
+    print(f"  {col}: {null_pct:.2f}%")
+
+# Impute with mean
+print("\nImputing missing values with mean...")
+for col in df_iris.columns:
+    if df_iris[col].isnull().sum() > 0:
+        mean_val = df_iris[col].mean()
+        df_iris[col].fillna(mean_val, inplace=True)
+        print(f"  Imputed {col} with mean: {mean_val:.2f}")
+
+print("\nMissing values after imputation:")
+print(df_iris.isnull().sum())
+
+# ============================================================
+# (ii) Min, Max, Mean for numerical columns
+# ============================================================
+print("\n" + "-"*40)
+print("(ii) Statistical Summary")
+print("-"*40)
+
+num_cols = df_iris.select_dtypes(include=[np.number]).columns
+print(f"\n{'Column':20} {'Min':10} {'Max':10} {'Mean':10}")
+print("-"*50)
+for col in num_cols:
+    print(f"{col:20} {df_iris[col].min():<10.2f} {df_iris[col].max():<10.2f} {df_iris[col].mean():<10.2f}")
+
+# ============================================================
+# (iii) Min-Max Normalization for SepalWidthCm
+# ============================================================
+print("\n" + "-"*40)
+print("(iii) Min-Max Normalization - SepalWidthCm")
+print("-"*40)
+
+before_min = df_iris['SepalWidthCm'].min()
+before_max = df_iris['SepalWidthCm'].max()
+before_mean = df_iris['SepalWidthCm'].mean()
+
+print("Before normalization:")
+print(f"  Min: {before_min:.2f}, Max: {before_max:.2f}, Mean: {before_mean:.2f}")
+
+# Min-Max formula: (x - min) / (max - min)
+df_iris['SepalWidthCm_Norm'] = (df_iris['SepalWidthCm'] - before_min) / (before_max - before_min)
+
+print("\nAfter normalization:")
+print(f"  Min: {df_iris['SepalWidthCm_Norm'].min():.2f}")
+print(f"  Max: {df_iris['SepalWidthCm_Norm'].max():.2f}")
+print(f"  Mean: {df_iris['SepalWidthCm_Norm'].mean():.2f}")
+
+print("\nFirst 10 values:")
+print(df_iris[['SepalWidthCm', 'SepalWidthCm_Norm']].head(10))
+
+# ============================================================
+# (iv) Bar Plot - Species Counts
+# ============================================================
+print("\n" + "-"*40)
+print("(iv) Bar Plot - Species Distribution")
+print("-"*40)
+
+species_counts = df_iris['Species'].value_counts()
+print("Species counts:")
+print(species_counts)
+
+plt.figure(figsize=(8, 5))
+plt.bar(species_counts.index, species_counts.values, color=['red', 'blue', 'green'])
+plt.xlabel('Species')
+plt.ylabel('Count')
+plt.title('Distribution of Iris Species')
+for i, v in enumerate(species_counts.values):
+    plt.text(i, v + 1, str(v), ha='center', fontweight='bold')
+plt.show()
+
+# ============================================================
+# PART 2: ASSOCIATION RULE MINING (Apriori)
+# ============================================================
+print("\n" + "="*50)
+print("PART 2: Association Rule Mining - Apriori Algorithm")
+print("="*50)
+
+# Load transaction data
+df_shop = pd.read_csv("B5_Shop2.csv")
+print("Shape:", df_shop.shape)
+print("\nFirst 5 rows:")
+print(df_shop.head())
+
+# Convert to list of transactions
+transactions = []
+for items in df_shop['Item']:
+    transaction = [item.strip() for item in items.split(',')]
+    transactions.append(transaction)
+
+print(f"\nTotal transactions: {len(transactions)}")
+print(f"Sample transaction: {transactions[0]}")
+
+# Get all unique items
+all_items = set()
+for trans in transactions:
+    for item in trans:
+        all_items.add(item)
+all_items = sorted(list(all_items))
+print(f"Unique items: {all_items}")
+
+# ============================================================
+# (v) Apriori Algorithm
+# ============================================================
+print("\n" + "-"*40)
+print("(v) Apriori Algorithm")
+print("-"*40)
+
+min_support_pct = 8
+min_confidence_pct = 50
+
+min_support_count = (min_support_pct / 100) * len(transactions)
+print(f"Support: {min_support_pct}% (min count = {min_support_count:.2f})")
+print(f"Confidence: {min_confidence_pct}%")
+
+# Function to calculate support
+def get_support(itemset, transactions):
+    count = 0
+    for trans in transactions:
+        if itemset.issubset(set(trans)):
+            count += 1
+    return count, (count / len(transactions)) * 100
+
+# Find frequent 1-itemsets (L1)
+print("\n" + "="*40)
+print("ITERATION 1: Finding frequent 1-itemsets")
+print("="*40)
+
+C1 = []
+for item in all_items:
+    support_count, support_pct = get_support({item}, transactions)
+    C1.append({'itemset': {item}, 'support_count': support_count, 'support_pct': support_pct})
+
+print("Candidate Set C1:")
+for c in C1:
+    print(f"  {c['itemset']}: count={c['support_count']}, support={c['support_pct']:.2f}%")
+
+L1 = [c for c in C1 if c['support_count'] >= min_support_count]
+
+print("\nFrequent Set L1 (after support filter):")
+for l in L1:
+    print(f"  {l['itemset']}: count={l['support_count']}, support={l['support_pct']:.2f}%")
+
+print(f"\nFrequent items found: {len(L1)}")
+
+# Find 2-itemsets
+print("\n" + "="*40)
+print("ITERATION 2: Finding frequent 2-itemsets")
+print("="*40)
+
+items_list = [list(l['itemset'])[0] for l in L1]
+C2 = []
+for combo in itertools.combinations(items_list, 2):
+    C2.append(set(combo))
+
+print("Candidate Set C2:")
+for c in C2:
+    print(f"  {c}")
+
+L2 = []
+for cand in C2:
+    support_count, support_pct = get_support(cand, transactions)
+    if support_count >= min_support_count:
+        L2.append({'itemset': cand, 'support_count': support_count, 'support_pct': support_pct})
+
+print("\nFrequent Set L2 (after support filter):")
+for l in L2:
+    print(f"  {l['itemset']}: count={l['support_count']}, support={l['support_pct']:.2f}%")
+
+# Generate association rules
+print("\n" + "="*40)
+print(f"ASSOCIATION RULES (Confidence >= {min_confidence_pct}%)")
+print("="*40)
+
+rules = []
+min_confidence = min_confidence_pct / 100
+
+for itemset_dict in L2:
+    itemset = list(itemset_dict['itemset'])
+    itemset_support = itemset_dict['support_count']
+    
+    # Rule 1: item1 → item2
+    support_item1, _ = get_support({itemset[0]}, transactions)
+    confidence1 = itemset_support / support_item1 if support_item1 > 0 else 0
+    
+    # Rule 2: item2 → item1
+    support_item2, _ = get_support({itemset[1]}, transactions)
+    confidence2 = itemset_support / support_item2 if support_item2 > 0 else 0
+    
+    if confidence1 >= min_confidence:
+        rules.append({
+            'rule': f"{itemset[0]} → {itemset[1]}",
+            'support': itemset_support / len(transactions),
+            'confidence': confidence1
+        })
+    
+    if confidence2 >= min_confidence:
+        rules.append({
+            'rule': f"{itemset[1]} → {itemset[0]}",
+            'support': itemset_support / len(transactions),
+            'confidence': confidence2
+        })
+
+if rules:
+    print(f"\n{'Rule':30} {'Support':12} {'Confidence':12}")
+    print("-"*55)
+    for rule in sorted(rules, key=lambda x: x['confidence'], reverse=True):
+        print(f"{rule['rule']:<30} {rule['support']*100:>6.2f}%     {rule['confidence']*100:>6.2f}%")
+    print(f"\nTotal rules found: {len(rules)}")
+else:
+    print("\nNo rules found. Try lower support threshold.")
+
+# ============================================================
+# FINAL SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("FINAL SUMMARY")
+print("="*50)
+print("\nIris Dataset:")
+print(f"  Samples: {len(df_iris)}")
+print(f"  Missing values after imputation: {df_iris.isnull().sum().sum()}")
+print(f"  SepalWidthCm normalized: {df_iris['SepalWidthCm_Norm'].min():.2f} to {df_iris['SepalWidthCm_Norm'].max():.2f}")
+print(f"  Species: {', '.join(species_counts.index)}")
+
+print("\nAssociation Rules:")
+print(f"  Transactions: {len(transactions)}")
+print(f"  Unique items: {len(all_items)}")
+print(f"  Support threshold: {min_support_pct}%")
+print(f"  Confidence threshold: {min_confidence_pct}%")
+print(f"  Frequent 1-itemsets: {len(L1)}")
+print(f"  Frequent 2-itemsets: {len(L2)}")
+print(f"  Association rules: {len(rules)}")
+print("="*50)
