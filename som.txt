@@ -1,0 +1,165 @@
+# SOM Clustering on Penguins Dataset
+print("QUESTION 1 - SOM Clustering")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+from minisom import MiniSom
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("B5_penguins_SLP.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# PART (i): Categorical/ Numerical Columns & Missing Values
+# ============================================================
+print("\n" + "="*50)
+print("PART (i): Data Analysis")
+print("="*50)
+
+# Find numerical and categorical columns
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+cat_cols = df.select_dtypes(include=['object']).columns.tolist()
+
+print(f"Numerical columns ({len(num_cols)}): {num_cols}")
+print(f"Categorical columns ({len(cat_cols)}): {cat_cols}")
+
+# Check missing values
+print("\nMissing values before imputation:")
+print(df.isnull().sum())
+
+# Impute missing values with MEAN
+print("\nImputing missing values with mean...")
+for col in num_cols:
+    if df[col].isnull().sum() > 0:
+        mean_val = df[col].mean()
+        df[col].fillna(mean_val, inplace=True)
+        print(f"  Imputed {col} with mean: {mean_val:.2f}")
+
+print("\nMissing values after imputation:")
+print(df.isnull().sum())
+
+# ============================================================
+# PART (ii): Standardization & Feature Selection
+# ============================================================
+print("\n" + "="*50)
+print("PART (ii): Standardization & Feature Selection")
+print("="*50)
+
+# Select input features
+X_columns = ['bill_length_mm', 'bill_depth_mm', 'flipper_length_mm', 'body_mass_g']
+X = df[X_columns].values
+
+print(f"Selected features: {X_columns}")
+print(f"X shape: {X.shape}")
+
+# Calculate BEFORE stats
+print("\nBefore standardization:")
+print(f"  Bill length - Mean: {X[:,0].mean():.2f}, Std: {X[:,0].std():.2f}")
+print(f"  Bill depth  - Mean: {X[:,1].mean():.2f}, Std: {X[:,1].std():.2f}")
+print(f"  Flipper len - Mean: {X[:,2].mean():.2f}, Std: {X[:,2].std():.2f}")
+print(f"  Body mass   - Mean: {X[:,3].mean():.2f}, Std: {X[:,3].std():.2f}")
+
+# Standardize
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("\nAfter standardization:")
+print(f"  Bill length - Mean: {X_scaled[:,0].mean():.2f}, Std: {X_scaled[:,0].std():.2f}")
+print(f"  Bill depth  - Mean: {X_scaled[:,1].mean():.2f}, Std: {X_scaled[:,1].std():.2f}")
+
+# SOM Parameters
+n_clusters = 2
+grid_size = int(np.ceil(np.sqrt(n_clusters)))
+max_iter = 1000
+
+print(f"\nSOM Parameters:")
+print(f"  Number of clusters: {n_clusters}")
+print(f"  Grid size: {grid_size}x{grid_size}")
+print(f"  Max iterations: {max_iter}")
+
+# ============================================================
+# PART (iii): Train SOM & Predict
+# ============================================================
+print("\n" + "="*50)
+print("PART (iii): Training SOM Model")
+print("="*50)
+
+# Create and train SOM
+som = MiniSom(x=grid_size, y=grid_size, input_len=X_scaled.shape[1],
+              sigma=1.0, learning_rate=0.5, random_seed=42)
+
+som.random_weights_init(X_scaled)
+som.train_random(X_scaled, max_iter)
+print("SOM training completed!")
+
+# Get cluster labels
+bmu_coordinates = np.array([som.winner(x) for x in X_scaled])
+cluster_labels = bmu_coordinates[:, 0] * grid_size + bmu_coordinates[:, 1]
+
+# Map to 0 and 1
+unique_labels = np.unique(cluster_labels)
+label_mapping = {old: new for new, old in enumerate(unique_labels[:n_clusters])}
+cluster_labels = np.array([label_mapping.get(label, 0) for label in cluster_labels])
+
+print("\nCluster distribution:")
+for i in range(n_clusters):
+    count = np.sum(cluster_labels == i)
+    print(f"  Cluster {i}: {count} samples ({count/len(cluster_labels)*100:.1f}%)")
+
+# ============================================================
+# PART (iv): Performance Analysis
+# ============================================================
+print("\n" + "="*50)
+print("PART (iv): Performance Analysis")
+print("="*50)
+
+sil_score = silhouette_score(X_scaled, cluster_labels)
+print(f"Silhouette Score: {sil_score:.4f}")
+
+if len(np.unique(cluster_labels)) > 1:
+    db_score = davies_bouldin_score(X_scaled, cluster_labels)
+    print(f"Davies-Bouldin Index: {db_score:.4f}")
+
+# ============================================================
+# PART (v): Scatter Plot
+# ============================================================
+print("\n" + "="*50)
+print("PART (v): Scatter Plot")
+print("="*50)
+
+plt.figure(figsize=(10, 6))
+colors = ['red', 'blue']
+
+for i in range(n_clusters):
+    cluster_points = df[cluster_labels == i]
+    plt.scatter(cluster_points['bill_length_mm'], cluster_points['bill_depth_mm'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6, s=50)
+
+plt.xlabel('Bill Length (mm)')
+plt.ylabel('Bill Depth (mm)')
+plt.title(f'SOM Clustering\nSilhouette Score: {sil_score:.4f}')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Total samples: {len(df)}")
+print(f"Features used: {X_columns}")
+print(f"Clusters: {n_clusters}")
+print(f"Silhouette Score: {sil_score:.4f}")
+print("="*50)
