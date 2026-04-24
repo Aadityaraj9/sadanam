@@ -1,0 +1,327 @@
+# Experiment 1 - EDA and Data Pre-processing
+print("EXPERIMENT 1")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load data
+df = pd.read_csv("Stores1a.csv")
+print("Dataset loaded! Shape:", df.shape)
+
+# ============================================================
+# PART A: EXPLORATORY DATA ANALYSIS
+# ============================================================
+
+# Q1: Number of rows and columns
+print("\n" + "="*40)
+print("Q1: Rows and Columns")
+print("="*40)
+print(f"Rows: {df.shape[0]}")
+print(f"Columns: {df.shape[1]}")
+
+# Q2: Categorical vs Numerical columns
+print("\n" + "="*40)
+print("Q2: Column Types")
+print("="*40)
+num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+cat_cols = df.select_dtypes(include=['object']).columns.tolist()
+print(f"Numerical columns ({len(num_cols)}): {num_cols}")
+print(f"Categorical columns ({len(cat_cols)}): {cat_cols}")
+
+# Q3: Min, Max, Mean for numerical columns
+print("\n" + "="*40)
+print("Q3: Min, Max, Mean")
+print("="*40)
+for col in num_cols:
+    print(f"{col}: Min={df[col].min():.2f}, Max={df[col].max():.2f}, Mean={df[col].mean():.2f}")
+
+# Q4: 5-number summary for Age + Box plot
+print("\n" + "="*40)
+print("Q4: Age - 5 Number Summary")
+print("="*40)
+print(f"Min: {df['Age'].min()}")
+print(f"Q1: {df['Age'].quantile(0.25)}")
+print(f"Median: {df['Age'].median()}")
+print(f"Q3: {df['Age'].quantile(0.75)}")
+print(f"Max: {df['Age'].max()}")
+
+plt.figure(figsize=(6,4))
+plt.boxplot(df['Age'])
+plt.title('Box Plot - Age')
+plt.show()
+
+# Q5: Outliers in Quantity using IQR
+print("\n" + "="*40)
+print("Q5: Outliers in Quantity (IQR method)")
+print("="*40)
+Q1 = df['Quantity'].quantile(0.25)
+Q3 = df['Quantity'].quantile(0.75)
+IQR = Q3 - Q1
+lower = Q1 - 1.5*IQR
+upper = Q3 + 1.5*IQR
+outliers = df[(df['Quantity'] < lower) | (df['Quantity'] > upper)]
+print(f"Outlier rows: {outliers.index.tolist()}")
+print(f"Outlier values: {outliers['Quantity'].tolist()}")
+
+# Q6: Outliers using Z-score
+print("\n" + "="*40)
+print("Q6: Outliers in Quantity (Z-score method)")
+print("="*40)
+z_scores = np.abs(stats.zscore(df['Quantity'].dropna()))
+outlier_idx = np.where(z_scores > 3)[0]
+for idx in outlier_idx:
+    print(f"Row {idx}: Value={df['Quantity'].iloc[idx]}, Z-score={z_scores[idx]:.2f}")
+
+# Q7: Correlation matrix
+print("\n" + "="*40)
+print("Q7: Correlation Matrix")
+print("="*40)
+corr_features = ['Age', 'Price', 'Quarterly_Tax', 'Weight']
+print(df[corr_features].corr())
+
+# Q8: Highest positive and negative correlation
+print("\n" + "="*40)
+print("Q8: Highest Correlations")
+print("="*40)
+corr_matrix = df[corr_features].corr()
+for i in range(len(corr_features)):
+    for j in range(i+1, len(corr_features)):
+        corr_val = corr_matrix.iloc[i,j]
+        print(f"{corr_features[i]} - {corr_features[j]}: {corr_val:.2f}")
+
+# Q9: Correlation > 70%
+print("\n" + "="*40)
+print("Q9: Correlations > 70%")
+print("="*40)
+for i in range(len(corr_features)):
+    for j in range(i+1, len(corr_features)):
+        if abs(corr_matrix.iloc[i,j]) > 0.7:
+            print(f"{corr_features[i]} - {corr_features[j]}: {corr_matrix.iloc[i,j]:.2f}")
+
+# Q10: Skewness of 'cc' column
+print("\n" + "="*40)
+print("Q10: Skewness of 'cc'")
+print("="*40)
+skew_val = df['cc'].skew()
+print(f"Skewness: {skew_val:.2f}")
+if skew_val > 0.5:
+    print("Right skew (positive)")
+elif skew_val < -0.5:
+    print("Left skew (negative)")
+else:
+    print("No skew (symmetric)")
+
+plt.figure(figsize=(6,4))
+plt.hist(df['cc'], bins=20, edgecolor='black')
+plt.title('Distribution of cc')
+plt.show()
+
+# Q11: Bar plot for Fuel_Type
+print("\n" + "="*40)
+print("Q11: Fuel_Type Distribution")
+print("="*40)
+print(df['Fuel_Type'].value_counts())
+plt.figure(figsize=(6,4))
+df['Fuel_Type'].value_counts().plot(kind='bar')
+plt.title('Fuel Type Counts')
+plt.show()
+
+# Q12: Swarm and Violin plot for Age
+print("\n" + "="*40)
+print("Q12: Age Distribution")
+print("="*40)
+plt.figure(figsize=(10,4))
+plt.subplot(1,2,1)
+sns.swarmplot(y=df['Age'])
+plt.title('Swarm Plot')
+plt.subplot(1,2,2)
+sns.violinplot(y=df['Age'])
+plt.title('Violin Plot')
+plt.show()
+
+# Q13: Scatter plot Age vs Price
+print("\n" + "="*40)
+print("Q13: Age vs Price")
+print("="*40)
+plt.figure(figsize=(6,4))
+plt.scatter(df['Age'], df['Price'], alpha=0.5)
+plt.xlabel('Age')
+plt.ylabel('Price')
+plt.title('Age vs Price')
+plt.show()
+
+# Q14: Box plot - Fuel_Type vs Age
+print("\n" + "="*40)
+print("Q14: Fuel_Type vs Age")
+print("="*40)
+plt.figure(figsize=(6,4))
+sns.boxplot(x='Fuel_Type', y='Age', data=df)
+plt.show()
+
+# Q15: Cross tab - Fuel_Type vs Gears
+print("\n" + "="*40)
+print("Q15: Fuel_Type vs Gears")
+print("="*40)
+print(pd.crosstab(df['Fuel_Type'], df['Gears']))
+
+# Q16: Pair plot
+print("\n" + "="*40)
+print("Q16: Pair Plot")
+print("="*40)
+sns.pairplot(df[['Age', 'Price', 'KM', 'Weight']])
+plt.show()
+
+# ============================================================
+# PART B: DATA PRE-PROCESSING
+# ============================================================
+
+# Load data for pre-processing
+df_b = pd.read_csv("Stores1b.csv")
+print("\n" + "="*40)
+print("PART B - Data Pre-processing")
+print("="*40)
+
+# Q17: Missing values %
+print("\n" + "="*40)
+print("Q17: Missing Values %")
+print("="*40)
+for col in df_b.columns:
+    null_pct = (df_b[col].isnull().sum() / len(df_b)) * 100
+    if null_pct > 0:
+        print(f"{col}: {null_pct:.2f}%")
+
+# Q18: Mean imputation
+print("\n" + "="*40)
+print("Q18: Mean Imputation")
+print("="*40)
+df_mean = df_b.copy()
+for col in df_b.columns:
+    if df_b[col].isnull().sum() > 0 and df_b[col].dtype in ['float64', 'int64']:
+        mean_val = df_b[col].mean()
+        df_mean[col].fillna(mean_val, inplace=True)
+        print(f"Imputed {col} with mean: {mean_val:.2f}")
+
+# Q19: Nearest method imputation
+print("\n" + "="*40)
+print("Q19: Nearest Imputation")
+print("="*40)
+df_nearest = df_b.copy()
+for col in df_b.columns:
+    if df_b[col].isnull().sum() > 0:
+        df_nearest[col].fillna(method='ffill', inplace=True)
+        df_nearest[col].fillna(method='bfill', inplace=True)
+        print(f"Imputed {col} using nearest method")
+
+# Q20: Mode imputation for categorical
+print("\n" + "="*40)
+print("Q20: Mode Imputation")
+print("="*40)
+df_mode = df_b.copy()
+for col in cat_cols:
+    if df_b[col].isnull().sum() > 0:
+        mode_val = df_b[col].mode()[0]
+        df_mode[col].fillna(mode_val, inplace=True)
+        print(f"Imputed {col} with mode: {mode_val}")
+
+# Q21: Drop columns with >10% missing
+print("\n" + "="*40)
+print("Q21: Drop Columns (>10% missing)")
+print("="*40)
+print(f"Before: {df_b.shape}")
+cols_to_drop = []
+for col in df_b.columns:
+    if (df_b[col].isnull().sum() / len(df_b)) * 100 > 10:
+        cols_to_drop.append(col)
+df_dropped = df_b.drop(columns=cols_to_drop)
+print(f"After: {df_dropped.shape}")
+print(f"Dropped: {cols_to_drop}")
+
+# Q22: Drop rows with Z-score > 3 for Quantity
+print("\n" + "="*40)
+print("Q22: Drop Outlier Rows (Z-score > 3)")
+print("="*40)
+print(f"Before: {df_b.shape}")
+z_scores = np.abs(stats.zscore(df_b['Quantity'].dropna()))
+outlier_idx = df_b.index[np.where(z_scores > 3)[0]]
+df_no_outliers = df_b.drop(index=outlier_idx)
+print(f"After: {df_no_outliers.shape}")
+print(f"Rows dropped: {len(outlier_idx)}")
+
+# Q23: % of duplicate rows
+print("\n" + "="*40)
+print("Q23: Duplicate Rows %")
+print("="*40)
+dup_pct = (df_b.duplicated().sum() / len(df_b)) * 100
+print(f"Duplicate rows: {dup_pct:.2f}%")
+
+# Q24: Drop duplicates
+print("\n" + "="*40)
+print("Q24: Drop Duplicates")
+print("="*40)
+print(f"Before: {df_b.shape}")
+df_no_dup = df_b.drop_duplicates()
+print(f"After: {df_no_dup.shape}")
+
+# Q25: Duplicates based on specific columns
+print("\n" + "="*40)
+print("Q25: Duplicates on ['Price','Age','Mfg_Month','Fuel_Type']")
+print("="*40)
+dup_specific = df_b.duplicated(subset=['Price', 'Age', 'Mfg_Month', 'Fuel_Type']).sum()
+print(f"Duplicate rows: {dup_specific} ({dup_specific/len(df_b)*100:.2f}%)")
+
+# Q26: Drop specific duplicates
+print("\n" + "="*40)
+print("Q26: Drop Specific Duplicates")
+print("="*40)
+print(f"Before: {df_b.shape}")
+df_specific_dedup = df_b.drop_duplicates(subset=['Price', 'Age', 'Mfg_Month', 'Fuel_Type'])
+print(f"After: {df_specific_dedup.shape}")
+
+# Q27: Min-Max normalization on Quarterly_Tax
+print("\n" + "="*40)
+print("Q27: Min-Max Normalization")
+print("="*40)
+df_norm = df_b.copy()
+min_val = df_b['Quarterly_Tax'].min()
+max_val = df_b['Quarterly_Tax'].max()
+df_norm['Quarterly_Tax_Norm'] = (df_b['Quarterly_Tax'] - min_val) / (max_val - min_val)
+print(f"Before: Min={min_val:.2f}, Max={max_val:.2f}")
+print(f"After: Min={df_norm['Quarterly_Tax_Norm'].min():.2f}, Max={df_norm['Quarterly_Tax_Norm'].max():.2f}")
+
+# Q28: Z-score normalization on Quarterly_Tax
+print("\n" + "="*40)
+print("Q28: Z-score Normalization")
+print("="*40)
+mean_val = df_b['Quarterly_Tax'].mean()
+std_val = df_b['Quarterly_Tax'].std()
+df_norm['Quarterly_Tax_Zscore'] = (df_b['Quarterly_Tax'] - mean_val) / std_val
+print(f"Before: Mean={mean_val:.2f}, Std={std_val:.2f}")
+print(f"After: Mean={df_norm['Quarterly_Tax_Zscore'].mean():.2f}, Std={df_norm['Quarterly_Tax_Zscore'].std():.2f}")
+
+# Q29: Label encoding for Fuel_Type
+print("\n" + "="*40)
+print("Q29: Label Encoding")
+print("="*40)
+df_label = df_b.copy()
+fuel_types = df_b['Fuel_Type'].unique()
+fuel_map = {fuel: i for i, fuel in enumerate(fuel_types)}
+df_label['Fuel_Type_Encoded'] = df_b['Fuel_Type'].map(fuel_map)
+print(f"Mapping: {fuel_map}")
+
+# Q30: One-hot encoding for Fuel_Type
+print("\n" + "="*40)
+print("Q30: One-Hot Encoding")
+print("="*40)
+one_hot = pd.get_dummies(df_b['Fuel_Type'], prefix='Fuel')
+df_onehot = pd.concat([df_b, one_hot], axis=1)
+print(f"New columns: {one_hot.columns.tolist()}")
+
+print("\n" + "="*40)
+print("EXPERIMENT 1 COMPLETED")
+print("="*40)
