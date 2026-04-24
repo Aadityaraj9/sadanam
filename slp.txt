@@ -1,0 +1,227 @@
+# Experiment 4 - Single Layer Perceptron for Iris Classification
+print("EXPERIMENT 4 - Single Layer Perceptron")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("iris_SLP.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# 2. PREPROCESSING (Missing values + Label Encoding)
+# ============================================================
+print("\n" + "="*50)
+print("PREPROCESSING")
+print("="*50)
+
+# Check missing values
+print("Missing values before:")
+print(df.isnull().sum())
+
+# Replace 0 values (errors) with NaN
+measure_cols = ['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']
+for col in measure_cols:
+    df[col] = df[col].replace(0, np.nan)
+
+# Impute with mean
+for col in measure_cols:
+    if df[col].isnull().sum() > 0:
+        df[col].fillna(df[col].mean(), inplace=True)
+
+print("\nMissing values after imputation:")
+print(df.isnull().sum())
+
+# Keep only 2 classes (Setosa and Versicolor) for binary classification
+df = df[df['Species'].isin(['Iris-setosa', 'Iris-versicolor'])].copy()
+
+# Label encoding: Setosa → 0, Versicolor → 1
+df['Species_encoded'] = (df['Species'] == 'Iris-versicolor').astype(int)
+
+print("\nClass distribution:")
+print(df['Species'].value_counts())
+print(f"Encoded: Setosa=0, Versicolor=1")
+
+# ============================================================
+# 3. SELECT X AND Y
+# ============================================================
+X_columns = ['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']
+X = df[X_columns].values
+Y = df['Species_encoded'].values
+
+print(f"\nX shape: {X.shape}")
+print(f"Y shape: {Y.shape}")
+
+# ============================================================
+# 4. STANDARDIZE
+# ============================================================
+print("\n" + "="*50)
+print("STANDARDIZATION")
+print("="*50)
+
+mean = X.mean(axis=0)
+std = X.std(axis=0)
+X_scaled = (X - mean) / std
+
+print(f"Before: Mean={X[:,0]:.2f}, Std={X[:,0]:.2f}")
+print(f"After: Mean={X_scaled[:,0]:.2f}, Std={X_scaled[:,0]:.2f}")
+
+# ============================================================
+# 5. TRAIN-TEST SPLIT (80-20)
+# ============================================================
+print("\n" + "="*50)
+print("TRAIN-TEST SPLIT")
+print("="*50)
+
+np.random.seed(42)
+n = len(X_scaled)
+indices = np.random.permutation(n)
+train_size = int(0.8 * n)
+
+X_train = X_scaled[indices[:train_size]]
+X_test = X_scaled[indices[train_size:]]
+y_train = Y[indices[:train_size]]
+y_test = Y[indices[train_size:]]
+
+print(f"Training samples: {len(X_train)}")
+print(f"Testing samples: {len(X_test)}")
+
+# ============================================================
+# 6. PERCEPTRON TRAINING
+# ============================================================
+print("\n" + "="*50)
+print("TRAINING PERCEPTRON")
+print("="*50)
+
+# Initialize
+weights = np.random.randn(4) * 0.01
+bias = 0
+lr = 0.01
+epochs = 1000
+
+# Training loop
+errors = []
+for epoch in range(epochs):
+    error_count = 0
+    for i in range(len(X_train)):
+        # Forward pass
+        z = np.dot(X_train[i], weights) + bias
+        pred = 1 if z >= 0 else 0
+        
+        # Calculate error
+        error = y_train[i] - pred
+        
+        # Update weights and bias
+        if error != 0:
+            weights += lr * error * X_train[i]
+            bias += lr * error
+            error_count += 1
+    
+    errors.append(error_count)
+    
+    if (epoch+1) % 200 == 0:
+        print(f"Epoch {epoch+1}: Misclassifications = {error_count}")
+
+print(f"\nFinal weights: {weights}")
+print(f"Final bias: {bias:.4f}")
+
+# Plot error reduction
+plt.figure(figsize=(8,4))
+plt.plot(errors)
+plt.xlabel('Epoch')
+plt.ylabel('Misclassifications')
+plt.title('Training Progress - Errors per Epoch')
+plt.show()
+
+# ============================================================
+# 7. TEST THE MODEL
+# ============================================================
+print("\n" + "="*50)
+print("TESTING")
+print("="*50)
+
+def predict(X, weights, bias):
+    z = np.dot(X, weights) + bias
+    return (z >= 0).astype(int)
+
+y_pred = predict(X_test, weights, bias)
+
+# Accuracy
+accuracy = (y_pred == y_test).sum() / len(y_test) * 100
+print(f"Test Accuracy: {accuracy:.2f}%")
+
+# Confusion Matrix
+tp = np.sum((y_test == 1) & (y_pred == 1))
+tn = np.sum((y_test == 0) & (y_pred == 0))
+fp = np.sum((y_test == 0) & (y_pred == 1))
+fn = np.sum((y_test == 1) & (y_pred == 0))
+
+print("\nConfusion Matrix:")
+print("            Predicted")
+print(f"Actual 0:   {tn}        {fp}")
+print(f"Actual 1:   {fn}        {tp}")
+
+# Metrics
+precision = tp / (tp + fp) if (tp+fp) > 0 else 0
+recall = tp / (tp + fn) if (tp+fn) > 0 else 0
+f1 = 2 * precision * recall / (precision + recall) if (precision+recall) > 0 else 0
+
+print(f"\nPrecision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-Score: {f1:.4f}")
+
+# ============================================================
+# 8. VISUALIZATION
+# ============================================================
+print("\n" + "="*50)
+print("VISUALIZATION")
+print("="*50)
+
+plt.figure(figsize=(10,5))
+
+# Plot 1: Test set predictions
+plt.subplot(1,2,1)
+colors = ['red', 'blue']
+for i in range(2):
+    mask = y_pred == i
+    plt.scatter(X_test[mask, 0], X_test[mask, 1], c=colors[i], label=f'Predicted {i}', alpha=0.6)
+plt.xlabel('Sepal Length (std)')
+plt.ylabel('Sepal Width (std)')
+plt.title(f'Predictions (Accuracy: {accuracy:.1f}%)')
+plt.legend()
+
+# Plot 2: Actual vs Predicted comparison
+plt.subplot(1,2,2)
+correct = y_pred == y_test
+plt.scatter(X_test[correct, 0], X_test[correct, 1], c='green', label='Correct', alpha=0.6)
+plt.scatter(X_test[~correct, 0], X_test[~correct, 1], c='red', label='Wrong', alpha=0.6)
+plt.xlabel('Sepal Length (std)')
+plt.ylabel('Sepal Width (std)')
+plt.title('Correct vs Wrong Predictions')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Total samples: {len(df)}")
+print(f"Features: {X_columns}")
+print(f"Classes: Setosa (0), Versicolor (1)")
+print(f"Test Accuracy: {accuracy:.2f}%")
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-Score: {f1:.4f}")
+print("="*50)
