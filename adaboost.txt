@@ -1,0 +1,175 @@
+# AdaBoost Classification on Iris Dataset
+print("AdaBoost - Iris Dataset")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.metrics import accuracy_score, precision_score, confusion_matrix
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("B5_iris_regression.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# PART (i): Missing Values %
+# ============================================================
+print("\n" + "="*50)
+print("PART (i): Missing Values Analysis")
+print("="*50)
+
+print("Missing value percentages:")
+for col in df.columns:
+    null_pct = (df[col].isnull().sum() / len(df)) * 100
+    print(f"  {col}: {null_pct:.2f}%")
+
+# Impute with mean
+print("\nImputing missing values with mean...")
+for col in df.columns:
+    if df[col].isnull().sum() > 0:
+        mean_val = df[col].mean()
+        df[col].fillna(mean_val, inplace=True)
+        print(f"  Imputed {col} with mean: {mean_val:.2f}")
+
+print("\nMissing values after imputation:")
+print(df.isnull().sum())
+
+# ============================================================
+# PART (ii): Label Encoding & Standardization & Split
+# ============================================================
+print("\n" + "="*50)
+print("PART (ii): Preprocessing")
+print("="*50)
+
+# Label encoding for target 'Species'
+print("\nOriginal species values:")
+print(df['Species'].value_counts())
+
+le = LabelEncoder()
+df['species_encoded'] = le.fit_transform(df['Species'])
+
+print("\nLabel Encoding Mapping:")
+for i, sp in enumerate(le.classes_):
+    print(f"  {sp} -> {i}")
+
+# Select features (X) and target (Y)
+X_columns = ['SepalWidthCm', 'SepalLengthCm', 'PetalWidthCm', 'PetalLengthCm']
+X = df[X_columns].values
+Y = df['species_encoded'].values
+
+print(f"\nFeatures: {X_columns}")
+print(f"X shape: {X.shape}")
+print(f"Y shape: {Y.shape}")
+
+# Standardize
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("\nBefore standardization:")
+print(f"  SepalWidthCm - Mean: {X[:,0].mean():.2f}, Std: {X[:,0].std():.2f}")
+
+print("\nAfter standardization:")
+print(f"  SepalWidthCm - Mean: {X_scaled[:,0].mean():.2f}, Std: {X_scaled[:,0].std():.2f}")
+
+# Split into train (80%) and test (20%)
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, Y, test_size=0.2, random_state=42)
+
+print(f"\nTraining samples: {len(X_train)} (80%)")
+print(f"Testing samples: {len(X_test)} (20%)")
+
+print("\nClass distribution in training:")
+for i in range(len(le.classes_)):
+    print(f"  {le.classes_[i]} (class {i}): {sum(y_train==i)} samples")
+
+# ============================================================
+# PART (iii): Train AdaBoost Model
+# ============================================================
+print("\n" + "="*50)
+print("PART (iii): Training AdaBoost Model")
+print("="*50)
+
+n_estimators = 100
+learning_rate = 1.0
+
+print(f"Parameters:")
+print(f"  n_estimators: {n_estimators}")
+print(f"  learning_rate: {learning_rate}")
+
+# Train model
+model = AdaBoostClassifier(n_estimators=n_estimators, learning_rate=learning_rate, random_state=42)
+model.fit(X_train, y_train)
+print("Model training completed!")
+
+# Predictions
+y_pred = model.predict(X_test)
+
+# ============================================================
+# PART (iv): Performance Analysis
+# ============================================================
+print("\n" + "="*50)
+print("PART (iv): Performance Analysis")
+print("="*50)
+
+accuracy = accuracy_score(y_test, y_pred)
+precision = precision_score(y_test, y_pred, average='weighted')
+
+print(f"Accuracy: {accuracy*100:.2f}%")
+print(f"Precision: {precision:.4f}")
+
+# Confusion Matrix
+cm = confusion_matrix(y_test, y_pred)
+print("\nConfusion Matrix:")
+print("-"*45)
+print(f"{'':18} {'Predicted':25}")
+print(f"{'':18} {'Class 0':10} {'Class 1':10} {'Class 2':10}")
+print("-"*45)
+for i in range(len(le.classes_)):
+    print(f"{'Actual ' + le.classes_[i]:18} ", end="")
+    for j in range(len(le.classes_)):
+        print(f"{cm[i][j]:10}", end="")
+    print()
+print("-"*45)
+
+# ============================================================
+# PART (v): Scatter Plot (SepalWidthCm vs SepalLengthCm)
+# ============================================================
+print("\n" + "="*50)
+print("PART (v): Scatter Plot")
+print("="*50)
+
+plt.figure(figsize=(10, 6))
+colors = {'Iris-setosa': 'red', 'Iris-versicolor': 'blue', 'Iris-virginica': 'green'}
+
+for species, color in colors.items():
+    subset = df[df['Species'] == species]
+    plt.scatter(subset['SepalWidthCm'], subset['SepalLengthCm'],
+                c=color, label=species, alpha=0.6, s=60, edgecolors='black')
+
+plt.xlabel('Sepal Width (cm)')
+plt.ylabel('Sepal Length (cm)')
+plt.title(f'AdaBoost Classification of Iris\nAccuracy: {accuracy*100:.2f}%')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Total samples: {len(df)}")
+print(f"Features: {X_columns}")
+print(f"Target classes: {list(le.classes_)}")
+print(f"Test Accuracy: {accuracy*100:.2f}%")
+print(f"Test Precision: {precision:.4f}")
+print("="*50)
