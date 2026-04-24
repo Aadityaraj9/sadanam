@@ -163,3 +163,188 @@ print(f"Features used: {X_columns}")
 print(f"Clusters: {n_clusters}")
 print(f"Silhouette Score: {sil_score:.4f}")
 print("="*50)
+===================================================================================================
+# SOM Clustering on Wine Dataset
+print("SOM Clustering - Wine Dataset")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+from minisom import MiniSom
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("B5_wineFCM.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# PART (i): Missing Values & Box Plot
+# ============================================================
+print("\n" + "="*50)
+print("PART (i): Missing Values & Outlier Analysis")
+print("="*50)
+
+# Check missing values percentage
+print("Missing value percentages:")
+for col in df.columns:
+    null_pct = (df[col].isnull().sum() / len(df)) * 100
+    print(f"  {col}: {null_pct:.2f}%")
+
+# Impute missing values with MEAN
+print("\nImputing missing values with mean...")
+for col in df.columns:
+    if df[col].isnull().sum() > 0:
+        mean_val = df[col].mean()
+        df[col].fillna(mean_val, inplace=True)
+        print(f"  Imputed {col} with mean: {mean_val:.2f}")
+
+# Box plot for Alcohol
+plt.figure(figsize=(8, 4))
+plt.boxplot(df['Alcohol'])
+plt.title('Box Plot of Alcohol')
+plt.ylabel('Alcohol')
+plt.show()
+
+print(f"\nAlcohol - Min: {df['Alcohol'].min():.2f}")
+print(f"Alcohol - Max: {df['Alcohol'].max():.2f}")
+print(f"Alcohol - Mean: {df['Alcohol'].mean():.2f}")
+
+# ============================================================
+# PART (ii): Standardization & Feature Selection
+# ============================================================
+print("\n" + "="*50)
+print("PART (ii): Standardization & Feature Selection")
+print("="*50)
+
+# Select all features (since dataset has only Alcohol and Malic_Acid)
+X_columns = df.columns.tolist()
+X = df.values
+
+print(f"Features used: {X_columns}")
+print(f"X shape: {X.shape}")
+
+# Standardize
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("\nBefore standardization:")
+print(f"  Alcohol - Mean: {X[:,0].mean():.2f}, Std: {X[:,0].std():.2f}")
+
+print("\nAfter standardization:")
+print(f"  Alcohol - Mean: {X_scaled[:,0].mean():.2f}, Std: {X_scaled[:,0].std():.2f}")
+
+# SOM Parameters
+n_clusters = 3
+grid_size = 2  # 2x2 grid for 3 clusters
+max_iter = 1000
+
+print(f"\nSOM Parameters:")
+print(f"  Number of clusters: {n_clusters}")
+print(f"  Grid size: {grid_size}x{grid_size}")
+print(f"  Max iterations: {max_iter}")
+
+# ============================================================
+# PART (iii): Train SOM & Predict & Get Centroids
+# ============================================================
+print("\n" + "="*50)
+print("PART (iii): Training SOM Model")
+print("="*50)
+
+# Create and train SOM
+som = MiniSom(x=grid_size, y=grid_size, input_len=X_scaled.shape[1],
+              sigma=1.0, learning_rate=0.5, random_seed=42)
+
+som.random_weights_init(X_scaled)
+som.train_random(X_scaled, max_iter)
+print("SOM training completed!")
+
+# Get cluster labels
+bmu_coordinates = np.array([som.winner(x) for x in X_scaled])
+cluster_labels = bmu_coordinates[:, 0] * grid_size + bmu_coordinates[:, 1]
+
+# Map to cluster numbers 0, 1, 2
+unique_labels = np.unique(cluster_labels)
+label_mapping = {old: new for new, old in enumerate(unique_labels[:n_clusters])}
+cluster_labels = np.array([label_mapping.get(label, 0) for label in cluster_labels])
+
+print("\nCluster distribution:")
+for i in range(n_clusters):
+    count = np.sum(cluster_labels == i)
+    print(f"  Cluster {i}: {count} samples ({count/len(cluster_labels)*100:.1f}%)")
+
+# Display cluster centroids (in original scale)
+print("\n" + "-"*40)
+print("CLUSTER CENTROIDS (Original Scale)")
+print("-"*40)
+
+for i in range(n_clusters):
+    cluster_data = df[cluster_labels == i]
+    centroid_alcohol = cluster_data['Alcohol'].mean()
+    centroid_malic = cluster_data['Malic_Acid'].mean()
+    print(f"Cluster {i}: Alcohol={centroid_alcohol:.2f}, Malic_Acid={centroid_malic:.2f}")
+
+# ============================================================
+# PART (iv): Performance Analysis
+# ============================================================
+print("\n" + "="*50)
+print("PART (iv): Performance Analysis")
+print("="*50)
+
+# Silhouette Score
+sil_score = silhouette_score(X_scaled, cluster_labels)
+print(f"Silhouette Score: {sil_score:.4f}")
+print("  → Higher = better clustering")
+
+# Partition Coefficient (simplified)
+# Measures fuzziness - higher means crisper clusters
+partition_coef = 0
+for i in range(n_clusters):
+    cluster_size = np.sum(cluster_labels == i)
+    p = (cluster_size / len(cluster_labels)) ** 2
+    partition_coef += p
+
+print(f"Partition Coefficient: {partition_coef:.4f}")
+print("  → Higher = crisper clusters")
+
+# ============================================================
+# PART (v): Scatter Plot
+# ============================================================
+print("\n" + "="*50)
+print("PART (v): Scatter Plot")
+print("="*50)
+
+plt.figure(figsize=(10, 6))
+colors = ['red', 'blue', 'green']
+
+for i in range(n_clusters):
+    cluster_points = df[cluster_labels == i]
+    plt.scatter(cluster_points['Alcohol'], cluster_points['Malic_Acid'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6, s=50, edgecolors='black')
+
+plt.xlabel('Alcohol')
+plt.ylabel('Malic Acid')
+plt.title(f'SOM Clustering of Wine (3 clusters)\nSilhouette Score: {sil_score:.4f}')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Total samples: {len(df)}")
+print(f"Features: {X_columns}")
+print(f"Clusters: {n_clusters}")
+print(f"Silhouette Score: {sil_score:.4f}")
+print(f"Partition Coefficient: {partition_coef:.4f}")
+print("="*50)
