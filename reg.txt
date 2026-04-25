@@ -1,0 +1,226 @@
+# Experiment 3 - Linear, Multiple Linear & Logistic Regression
+print("EXPERIMENT 3")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore')
+
+# Load data
+df = pd.read_csv("wine regression.csv")
+print("Shape:", df.shape)
+print(df.head())
+
+# Clean missing values
+for col in df.columns:
+    if df[col].isnull().sum() > 0:
+        df[col].fillna(df[col].mean(), inplace=True)
+
+# ============================================================
+# PART 1: SIMPLE LINEAR REGRESSION (Alcohol → Quality)
+# ============================================================
+print("\n" + "="*50)
+print("PART 1: Simple Linear Regression")
+print("="*50)
+
+X = df['alcohol'].values
+Y = df['quality'].values
+
+# Calculate b0 and b1
+x_mean = X.mean()
+y_mean = Y.mean()
+numerator = ((X - x_mean) * (Y - y_mean)).sum()
+denominator = ((X - x_mean)**2).sum()
+b1 = numerator / denominator
+b0 = y_mean - b1 * x_mean
+
+print(f"Equation: Quality = {b0:.4f} + {b1:.4f} * Alcohol")
+
+# Predictions
+Y_pred = b0 + b1 * X
+
+# SSE (Sum of Squared Errors)
+sse = ((Y - Y_pred)**2).sum()
+print(f"SSE: {sse:.4f}")
+
+# RMSE
+rmse = (sse / len(Y))**0.5
+print(f"RMSE: {rmse:.4f}")
+
+# R-squared
+sst = ((Y - y_mean)**2).sum()
+r2 = 1 - (sse / sst)
+print(f"R-squared: {r2:.4f}")
+
+# Plot
+plt.figure(figsize=(8,5))
+plt.scatter(X, Y, alpha=0.5, label='Actual')
+plt.plot(X, Y_pred, 'r-', label='Regression Line')
+plt.xlabel('Alcohol')
+plt.ylabel('Quality')
+plt.title(f'Simple Linear Regression (R² = {r2:.4f})')
+plt.legend()
+plt.show()
+
+# Predict for new value
+new_alcohol = float(input("\nEnter alcohol value to predict quality: "))
+new_quality = b0 + b1 * new_alcohol
+print(f"Predicted quality: {new_quality:.2f}")
+
+# ============================================================
+# PART 2: MULTIPLE LINEAR REGRESSION (Alcohol + Sulphates → Quality)
+# ============================================================
+print("\n" + "="*50)
+print("PART 2: Multiple Linear Regression")
+print("="*50)
+
+X1 = df['alcohol'].values
+X2 = df['sulphates'].values
+Y = df['quality'].values
+
+# Add column of ones for intercept
+n = len(Y)
+X_matrix = np.column_stack((np.ones(n), X1, X2))
+
+# Calculate coefficients: β = (X^T X)^(-1) X^T Y
+XTX = X_matrix.T @ X_matrix
+XTX_inv = np.linalg.inv(XTX)
+XTY = X_matrix.T @ Y
+beta = XTX_inv @ XTY
+
+b0, b1, b2 = beta
+print(f"Equation: Quality = {b0:.4f} + {b1:.4f}*Alcohol + {b2:.4f}*Sulphates")
+
+# Predictions
+Y_pred = b0 + b1*X1 + b2*X2
+
+# SSE, RMSE, R-squared
+sse = ((Y - Y_pred)**2).sum()
+rmse = (sse / n)**0.5
+sst = ((Y - y_mean)**2).sum()
+r2 = 1 - (sse / sst)
+
+print(f"SSE: {sse:.4f}")
+print(f"RMSE: {rmse:.4f}")
+print(f"R-squared: {r2:.4f}")
+
+# Predict for new values
+print("\nEnter values for prediction:")
+new_x1 = float(input("Alcohol: "))
+new_x2 = float(input("Sulphates: "))
+new_y = b0 + b1*new_x1 + b2*new_x2
+print(f"Predicted quality: {new_y:.2f}")
+
+# ============================================================
+# PART 3: LOGISTIC REGRESSION (All features → Wine Type)
+# ============================================================
+print("\n" + "="*50)
+print("PART 3: Logistic Regression")
+print("="*50)
+
+from sklearn.preprocessing import LabelEncoder
+
+# Prepare data
+df_log = df.copy()
+
+# Encode target (type)
+le = LabelEncoder()
+df_log['type_encoded'] = le.fit_transform(df_log['type'])
+print(f"Type mapping: {dict(zip(le.classes_, le.transform(le.classes_)))}")
+
+# Features (all except type and quality)
+X_cols = ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar',
+          'chlorides', 'free sulfur dioxide', 'total sulfur dioxide', 
+          'density', 'pH', 'sulphates', 'alcohol']
+X = df_log[X_cols].values
+Y = df_log['type_encoded'].values
+
+# Standardize
+from sklearn.preprocessing import StandardScaler
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+# Train-test split (manual)
+np.random.seed(42)
+indices = np.random.permutation(len(X))
+train_size = int(0.8 * len(X))
+train_idx = indices[:train_size]
+test_idx = indices[train_size:]
+
+X_train, X_test = X[train_idx], X[test_idx]
+y_train, y_test = Y[train_idx], Y[test_idx]
+
+# Add bias term
+X_train = np.column_stack((np.ones(len(X_train)), X_train))
+X_test = np.column_stack((np.ones(len(X_test)), X_test))
+
+# Sigmoid function
+def sigmoid(z):
+    z = np.clip(z, -500, 500)
+    return 1 / (1 + np.exp(-z))
+
+# Initialize parameters
+theta = np.zeros(X_train.shape[1])
+lr = 0.01
+iterations = 1000
+m = len(y_train)
+
+# Gradient descent
+costs = []
+for i in range(iterations):
+    z = X_train @ theta
+    h = sigmoid(z)
+    gradient = (1/m) * (X_train.T @ (h - y_train))
+    theta -= lr * gradient
+    
+    # Calculate cost
+    eps = 1e-15
+    cost = -(1/m) * np.sum(y_train * np.log(h + eps) + (1-y_train) * np.log(1-h + eps))
+    costs.append(cost)
+    
+    if (i+1) % 200 == 0:
+        print(f"Iteration {i+1}: Cost = {cost:.6f}")
+
+# Predictions
+def predict(X, theta):
+    return (sigmoid(X @ theta) >= 0.5).astype(int)
+
+y_pred = predict(X_test, theta)
+
+# Accuracy
+accuracy = (y_pred == y_test).sum() / len(y_test) * 100
+print(f"\nTest Accuracy: {accuracy:.2f}%")
+
+# Confusion Matrix
+cm = np.zeros((2,2), dtype=int)
+for i in range(len(y_test)):
+    cm[y_test[i], y_pred[i]] += 1
+
+print("\nConfusion Matrix:")
+print("            Predicted")
+print(f"Actual 0:   {cm[0,0]}        {cm[0,1]}")
+print(f"Actual 1:   {cm[1,0]}        {cm[1,1]}")
+
+# Precision & Recall
+tp, tn, fp, fn = cm[1,1], cm[0,0], cm[0,1], cm[1,0]
+precision = tp / (tp + fp) if (tp+fp) > 0 else 0
+recall = tp / (tp + fn) if (tp+fn) > 0 else 0
+f1 = 2 * precision * recall / (precision + recall) if (precision+recall) > 0 else 0
+
+print(f"\nPrecision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-Score: {f1:.4f}")
+
+# Plot cost vs iteration
+plt.figure(figsize=(6,4))
+plt.plot(costs)
+plt.xlabel('Iteration')
+plt.ylabel('Cost')
+plt.title('Gradient Descent - Cost Reduction')
+plt.show()
+
+print("\n" + "="*50)
+print("EXPERIMENT 3 COMPLETED")
+print("="*50)
