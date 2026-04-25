@@ -1,0 +1,266 @@
+# Experiment 7 - Fuzzy C-Means Clustering on Wine Dataset
+print("EXPERIMENT 7 - Fuzzy C-Means Clustering")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import silhouette_score
+from fcmeans import FCM
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("wineFCM.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# PART (i): Missing Values & Box Plot
+# ============================================================
+print("\n" + "="*50)
+print("PART (i): Missing Values & Outlier Analysis")
+print("="*50)
+
+# Check missing values
+print("Missing values:")
+print(df.isnull().sum())
+
+# Impute with mean
+for col in df.columns:
+    if df[col].isnull().sum() > 0:
+        mean_val = df[col].mean()
+        df[col].fillna(mean_val, inplace=True)
+        print(f"Imputed {col} with mean: {mean_val:.2f}")
+
+# Box plot for Alcohol
+plt.figure(figsize=(8,4))
+plt.boxplot(df['Alcohol'])
+plt.title('Box Plot - Alcohol')
+plt.ylabel('Alcohol')
+plt.show()
+
+print(f"\nAlcohol - Min: {df['Alcohol'].min():.2f}")
+print(f"Alcohol - Max: {df['Alcohol'].max():.2f}")
+print(f"Alcohol - Mean: {df['Alcohol'].mean():.2f}")
+
+# ============================================================
+# PART (ii): Standardization & Feature Selection
+# ============================================================
+print("\n" + "="*50)
+print("PART (ii): Standardization & Feature Selection")
+print("="*50)
+
+# Select features (both columns)
+X_columns = df.columns.tolist()
+X = df.values
+
+print(f"Features: {X_columns}")
+print(f"X shape: {X.shape}")
+
+# Standardize
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+print("\nBefore standardization:")
+print(f"  Alcohol - Mean: {X[:,0].mean():.2f}, Std: {X[:,0].std():.2f}")
+
+print("\nAfter standardization:")
+print(f"  Alcohol - Mean: {X_scaled[:,0].mean():.2f}, Std: {X_scaled[:,0].std():.2f}")
+
+# FCM Parameters
+n_clusters_range = [2, 3, 4, 5]
+m = 2  # fuzziness index
+max_iter = 150
+
+print(f"\nFCM Parameters:")
+print(f"  Clusters to try: {n_clusters_range}")
+print(f"  Fuzziness index (m): {m}")
+print(f"  Max iterations: {max_iter}")
+
+# ============================================================
+# PART (iii)-(iv): FCM Clustering & Evaluation
+# ============================================================
+print("\n" + "="*50)
+print("PART (iii)-(iv): FCM Clustering & Evaluation")
+print("="*50)
+
+results = []
+fcm_models = {}
+labels_dict = {}
+
+for n_clusters in n_clusters_range:
+    print(f"\n--- Clustering with {n_clusters} clusters ---")
+    
+    # Create and fit FCM
+    fcm = FCM(n_clusters=n_clusters, m=m, max_iter=max_iter, random_state=42)
+    fcm.fit(X_scaled)
+    
+    # Get labels (hard assignment - highest membership)
+    labels = fcm.predict(X_scaled)
+    
+    # Store
+    fcm_models[n_clusters] = fcm
+    labels_dict[n_clusters] = labels
+    
+    # Silhouette score
+    sil_score = silhouette_score(X_scaled, labels)
+    
+    # Partition Coefficient (measures fuzziness - higher = crisper)
+    membership = fcm.u
+    partition_coef = np.mean(np.sum(membership**2, axis=1))
+    
+    # Partition Entropy (measures uncertainty - lower = better)
+    partition_entropy = -np.mean(np.sum(membership * np.log(membership + 1e-10), axis=1))
+    
+    results.append({
+        'n_clusters': n_clusters,
+        'silhouette': sil_score,
+        'partition_coef': partition_coef,
+        'partition_entropy': partition_entropy
+    })
+    
+    print(f"  Silhouette Score: {sil_score:.4f}")
+    print(f"  Partition Coefficient: {partition_coef:.4f}")
+    print(f"  Partition Entropy: {partition_entropy:.4f}")
+    
+    # Show cluster distribution
+    unique, counts = np.unique(labels, return_counts=True)
+    for cluster, count in zip(unique, counts):
+        print(f"  Cluster {cluster}: {count} samples ({count/len(labels)*100:.1f}%)")
+
+# ============================================================
+# PART (v): Plot Silhouette Curve
+# ============================================================
+print("\n" + "="*50)
+print("PART (v): Silhouette Score Curve")
+print("="*50)
+
+plt.figure(figsize=(10,5))
+n_vals = [r['n_clusters'] for r in results]
+sil_vals = [r['silhouette'] for r in results]
+
+plt.plot(n_vals, sil_vals, 'bo-', linewidth=2, markersize=8)
+plt.xlabel('Number of Clusters')
+plt.ylabel('Silhouette Score')
+plt.title('Silhouette Score vs Number of Clusters')
+plt.grid(True, alpha=0.3)
+
+# Mark best
+best_idx = np.argmax(sil_vals)
+best_n = n_vals[best_idx]
+plt.plot(best_n, sil_vals[best_idx], 'r*', markersize=15, label=f'Best: {best_n} clusters')
+plt.legend()
+plt.show()
+
+# ============================================================
+# PART (vi): Select Best Model
+# ============================================================
+print("\n" + "="*50)
+print("PART (vi): Best Model Selection")
+print("="*50)
+
+best_n = n_vals[np.argmax(sil_vals)]
+best_labels = labels_dict[best_n]
+best_fcm = fcm_models[best_n]
+
+print(f"✅ Best model: {best_n} clusters (Silhouette = {max(sil_vals):.4f})")
+
+# ============================================================
+# PART (vii): Display Cluster Centroids
+# ============================================================
+print("\n" + "="*50)
+print("PART (vii): Cluster Centroids")
+print("="*50)
+
+# Get centroids from FCM
+centroids = best_fcm.centers
+
+# Convert back to original scale
+centroids_original = scaler.inverse_transform(centroids)
+
+print(f"Centroids for {best_n} clusters (original scale):")
+for i, centroid in enumerate(centroids_original):
+    print(f"  Cluster {i}: Alcohol={centroid[0]:.2f}, Malic_Acid={centroid[1]:.2f}")
+
+# ============================================================
+# PART (viii): Visualize Clusters
+# ============================================================
+print("\n" + "="*50)
+print("PART (viii): Cluster Visualization")
+print("="*50)
+
+# Get membership values for best model
+membership = best_fcm.u
+max_membership = np.max(membership, axis=1)
+
+plt.figure(figsize=(12,5))
+
+# Plot 1: Hard assignment
+plt.subplot(1,2,1)
+colors = ['red', 'blue', 'green', 'purple', 'orange'][:best_n]
+for i in range(best_n):
+    cluster_points = df[best_labels == i]
+    plt.scatter(cluster_points['Alcohol'], cluster_points['Malic_Acid'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6, s=50)
+plt.xlabel('Alcohol')
+plt.ylabel('Malic Acid')
+plt.title(f'FCM Clustering - {best_n} Clusters (Hard Assignment)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+
+# Plot 2: Fuzzy visualization (size = membership strength)
+plt.subplot(1,2,2)
+for i in range(best_n):
+    cluster_points = df[best_labels == i]
+    sizes = max_membership[best_labels == i] * 200
+    plt.scatter(cluster_points['Alcohol'], cluster_points['Malic_Acid'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6, s=sizes)
+plt.xlabel('Alcohol')
+plt.ylabel('Malic Acid')
+plt.title(f'FCM Clustering (Point size = Membership Strength)')
+plt.legend()
+plt.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# PART (ix): Export for Tableau/Power BI
+# ============================================================
+print("\n" + "="*50)
+print("PART (ix): Export for Visualization")
+print("="*50)
+
+# Create export dataframe
+df_export = df.copy()
+df_export['Cluster'] = best_labels
+df_export['Max_Membership'] = max_membership
+df_export['Uncertainty'] = 1 - max_membership
+
+# Add membership for each cluster
+for i in range(best_n):
+    df_export[f'Membership_Cluster{i}'] = membership[:, i]
+
+df_export.to_csv("wineFCM_with_clusters.csv", index=False)
+print("File saved: wineFCM_with_clusters.csv")
+print(f"Columns: {df_export.columns.tolist()}")
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Dataset: wineFCM.csv")
+print(f"Total samples: {len(df)}")
+print(f"Features: Alcohol, Malic_Acid")
+print(f"Fuzziness index (m): {m}")
+print(f"Clusters tested: {n_clusters_range}")
+print(f"Best number of clusters: {best_n}")
+print(f"Best Silhouette Score: {max(sil_vals):.4f}")
+print("="*50)
