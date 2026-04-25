@@ -1,0 +1,196 @@
+# Experiment 6 - Hierarchical Clustering on Wine Dataset
+print("EXPERIMENT 6 - Hierarchical Agglomerative Clustering")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from scipy.cluster.hierarchy import dendrogram, linkage
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import silhouette_score, davies_bouldin_score
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("wine_clustering.csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# 2. STANDARDIZE
+# ============================================================
+print("\n" + "="*50)
+print("STANDARDIZATION")
+print("="*50)
+
+scaler = StandardScaler()
+df_scaled = scaler.fit_transform(df)
+df_scaled = pd.DataFrame(df_scaled, columns=df.columns)
+
+print("Data standardized!")
+print(f"Mean of Alcohol: {df_scaled['Alcohol'].mean():.2f}")
+print(f"Std of Alcohol: {df_scaled['Alcohol'].std():.2f}")
+
+# ============================================================
+# 3. PLOT DENDOGRAM
+# ============================================================
+print("\n" + "="*50)
+print("DENDOGRAM")
+print("="*50)
+
+# Calculate linkage matrix
+linked = linkage(df_scaled, method='ward')
+
+# Plot dendrogram
+plt.figure(figsize=(12, 6))
+dendrogram(linked, orientation='top', no_labels=True)
+plt.title('Hierarchical Clustering Dendrogram')
+plt.xlabel('Sample Index')
+plt.ylabel('Distance')
+plt.axhline(y=10, color='r', linestyle='--', label='Cut at distance=10')
+plt.legend()
+plt.show()
+
+print("Dendrogram shows how clusters merge at different distances")
+
+# ============================================================
+# 4. CREATE CLUSTERING MODELS (3 and 4 clusters)
+# ============================================================
+print("\n" + "="*50)
+print("CLUSTERING MODELS")
+print("="*50)
+
+# Model with 3 clusters
+model_3 = AgglomerativeClustering(n_clusters=3, metric='euclidean', linkage='ward')
+labels_3 = model_3.fit_predict(df_scaled)
+
+# Model with 4 clusters
+model_4 = AgglomerativeClustering(n_clusters=4, metric='euclidean', linkage='ward')
+labels_4 = model_4.fit_predict(df_scaled)
+
+print("Models created!")
+print(f"\n3 clusters - Distribution:")
+for i in range(3):
+    print(f"  Cluster {i}: {sum(labels_3==i)} samples")
+    
+print(f"\n4 clusters - Distribution:")
+for i in range(4):
+    print(f"  Cluster {i}: {sum(labels_4==i)} samples")
+
+# ============================================================
+# 5. VISUALIZE CLUSTERS
+# ============================================================
+print("\n" + "="*50)
+print("VISUALIZATION")
+print("="*50)
+
+plt.figure(figsize=(12,5))
+
+# Plot 3 clusters
+plt.subplot(1,2,1)
+colors = ['red', 'blue', 'green']
+for i in range(3):
+    mask = labels_3 == i
+    plt.scatter(df_scaled.loc[mask, 'Alcohol'], df_scaled.loc[mask, 'Malic_Acid'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6)
+plt.xlabel('Alcohol')
+plt.ylabel('Malic Acid')
+plt.title('3 Clusters')
+plt.legend()
+
+# Plot 4 clusters
+plt.subplot(1,2,2)
+colors = ['red', 'blue', 'green', 'purple']
+for i in range(4):
+    mask = labels_4 == i
+    plt.scatter(df_scaled.loc[mask, 'Alcohol'], df_scaled.loc[mask, 'Malic_Acid'],
+                c=colors[i], label=f'Cluster {i}', alpha=0.6)
+plt.xlabel('Alcohol')
+plt.ylabel('Malic Acid')
+plt.title('4 Clusters')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# 6. EVALUATION METRICS
+# ============================================================
+print("\n" + "="*50)
+print("EVALUATION METRICS")
+print("="*50)
+
+# Silhouette Score (higher = better)
+sil_3 = silhouette_score(df_scaled, labels_3)
+sil_4 = silhouette_score(df_scaled, labels_4)
+
+# Davies-Bouldin Index (lower = better)
+db_3 = davies_bouldin_score(df_scaled, labels_3)
+db_4 = davies_bouldin_score(df_scaled, labels_4)
+
+print(f"{'Metric':20} {'3 Clusters':15} {'4 Clusters':15}")
+print("-"*50)
+print(f"{'Silhouette Score':20} {sil_3:15.4f} {sil_4:15.4f}")
+print(f"{'Davies-Bouldin':20} {db_3:15.4f} {db_4:15.4f}")
+
+# ============================================================
+# 7. SELECT BEST MODEL
+# ============================================================
+print("\n" + "="*50)
+print("BEST MODEL SELECTION")
+print("="*50)
+
+if sil_3 > sil_4:
+    best_n = 3
+    best_labels = labels_3
+    print(f"✅ Best model: 3 clusters (Silhouette = {sil_3:.4f} > {sil_4:.4f})")
+else:
+    best_n = 4
+    best_labels = labels_4
+    print(f"✅ Best model: 4 clusters (Silhouette = {sil_4:.4f} > {sil_3:.4f})")
+
+# Add cluster labels to original dataframe
+df['Cluster'] = best_labels
+
+# ============================================================
+# 8. ANALYZE CLUSTER CHARACTERISTICS
+# ============================================================
+print("\n" + "="*50)
+print("CLUSTER CHARACTERISTICS")
+print("="*50)
+
+print("\nAverage values per cluster (Alcohol and Malic Acid):")
+for i in range(best_n):
+    cluster_data = df[df['Cluster'] == i]
+    print(f"\nCluster {i}:")
+    print(f"  Alcohol:    {cluster_data['Alcohol'].mean():.2f}")
+    print(f"  Malic Acid: {cluster_data['Malic_Acid'].mean():.2f}")
+    print(f"  Size:       {len(cluster_data)} samples")
+
+# ============================================================
+# 9. EXPORT FOR TABLEAU
+# ============================================================
+print("\n" + "="*50)
+print("EXPORT FOR TABLEAU")
+print("="*50)
+
+df.to_csv("wine_clustering_with_labels.csv", index=False)
+print("File saved: wine_clustering_with_labels.csv")
+print(f"Columns: {df.columns.tolist()}")
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("SUMMARY")
+print("="*50)
+print(f"Total samples: {len(df)}")
+print(f"Features: 13")
+print(f"Clusters compared: 3 vs 4")
+print(f"Best model: {best_n} clusters")
+print(f"Silhouette Score: {max(sil_3, sil_4):.4f}")
+print("="*50)
