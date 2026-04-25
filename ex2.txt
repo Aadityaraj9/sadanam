@@ -1,0 +1,306 @@
+# Experiment 2 - Feature Selection and Feature Extraction on Wine Dataset
+print("EXPERIMENT 2 - Feature Selection and Feature Extraction")
+print("Regno: URK23CS1010")
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+# ============================================================
+# 1. LOAD DATA
+# ============================================================
+df = pd.read_csv("B3_winequality_feature (1).csv")
+print("Shape:", df.shape)
+print("\nFirst 5 rows:")
+print(df.head())
+
+# ============================================================
+# Q1: Read data (already done above)
+# ============================================================
+
+# ============================================================
+# Q2: Drop 'chlorides' and 'free sulfur dioxide'
+# ============================================================
+print("\n" + "="*50)
+print("Q2: Drop Columns")
+print("="*50)
+
+print("Before:", df.columns.tolist())
+df.drop(['chlorides', 'free sulfur dioxide'], axis=1, inplace=True)
+print("After:", df.columns.tolist())
+print(f"Shape: {df.shape}")
+
+# ============================================================
+# Q3: Identify & Drop columns with outliers (IQR method)
+# ============================================================
+print("\n" + "="*50)
+print("Q3: Drop Columns with Outliers (IQR)")
+print("="*50)
+
+df_temp = df.copy()
+num_cols = df_temp.select_dtypes(include=[np.number]).columns.tolist()
+num_cols.remove('quality')
+
+cols_with_outliers = []
+for col in num_cols:
+    Q1 = df_temp[col].quantile(0.25)
+    Q3 = df_temp[col].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5*IQR
+    upper = Q3 + 1.5*IQR
+    outliers = df_temp[(df_temp[col] < lower) | (df_temp[col] > upper)]
+    if len(outliers) > 0:
+        cols_with_outliers.append(col)
+        print(f"{col}: {len(outliers)} outliers")
+
+df_temp.drop(columns=cols_with_outliers, inplace=True)
+print(f"\nDropped columns: {cols_with_outliers}")
+print(f"Shape after: {df_temp.shape}")
+
+# ============================================================
+# Q4: Drop columns with variance < 0.5
+# ============================================================
+print("\n" + "="*50)
+print("Q4: Drop Low Variance Columns (<0.5)")
+print("="*50)
+
+df_temp2 = df.copy()
+num_cols = df_temp2.select_dtypes(include=[np.number]).columns.tolist()
+num_cols.remove('quality')
+
+low_var_cols = []
+for col in num_cols:
+    var_val = df_temp2[col].var()
+    print(f"{col}: {var_val:.4f}")
+    if var_val < 0.5:
+        low_var_cols.append(col)
+
+df_temp2.drop(columns=low_var_cols, inplace=True)
+print(f"\nDropped: {low_var_cols}")
+print(f"Shape after: {df_temp2.shape}")
+
+# ============================================================
+# Q5: Find columns with correlation < 0.1 to target 'quality'
+# ============================================================
+print("\n" + "="*50)
+print("Q5: Low Correlation with Quality (<0.1)")
+print("="*50)
+
+features = [col for col in df.columns if col != 'quality']
+low_corr_cols = []
+for col in features:
+    corr = abs(df[col].corr(df['quality']))
+    print(f"{col}: {corr:.4f}")
+    if corr < 0.1:
+        low_corr_cols.append(col)
+
+print(f"\nLow correlation columns: {low_corr_cols}")
+
+# ============================================================
+# Q6: Drop low correlation columns
+# ============================================================
+print("\n" + "="*50)
+print("Q6: Drop Low Correlation Columns")
+print("="*50)
+
+df_temp3 = df.copy()
+print(f"Before: {df_temp3.shape}")
+df_temp3.drop(columns=low_corr_cols, inplace=True)
+print(f"After: {df_temp3.shape}")
+print(f"Remaining: {df_temp3.columns.tolist()}")
+
+# ============================================================
+# Q7: Find highly correlated feature pairs (>65%)
+# ============================================================
+print("\n" + "="*50)
+print("Q7: Highly Correlated Pairs (>65%)")
+print("="*50)
+
+features = [col for col in df.columns if col != 'quality']
+corr_matrix = df[features].corr()
+
+high_corr_pairs = []
+for i in range(len(corr_matrix.columns)):
+    for j in range(i+1, len(corr_matrix.columns)):
+        corr_val = abs(corr_matrix.iloc[i, j])
+        if corr_val > 0.65:
+            high_corr_pairs.append((corr_matrix.columns[i], corr_matrix.columns[j], corr_val))
+
+for f1, f2, val in high_corr_pairs:
+    print(f"{f1} - {f2}: {val:.4f}")
+
+# ============================================================
+# Q8: Drop one from each highly correlated pair
+# ============================================================
+print("\n" + "="*50)
+print("Q8: Drop One from Each Correlated Pair")
+print("="*50)
+
+df_temp4 = df.copy()
+features_to_drop = set()
+
+for f1, f2, val in high_corr_pairs:
+    corr1 = abs(df[f1].corr(df['quality']))
+    corr2 = abs(df[f2].corr(df['quality']))
+    if corr1 < corr2:
+        features_to_drop.add(f1)
+        print(f"Dropping {f1} (corr={corr1:.4f}), keeping {f2} (corr={corr2:.4f})")
+    else:
+        features_to_drop.add(f2)
+        print(f"Dropping {f2} (corr={corr2:.4f}), keeping {f1} (corr={corr1:.4f})")
+
+df_temp4.drop(columns=list(features_to_drop), inplace=True)
+print(f"\nShape after: {df_temp4.shape}")
+print(f"Remaining: {df_temp4.columns.tolist()}")
+
+# ============================================================
+# Q9: Separate X and Y
+# ============================================================
+print("\n" + "="*50)
+print("Q9: Separate X and Y")
+print("="*50)
+
+X_columns = ['fixed acidity', 'volatile acidity', 'citric acid', 'residual sugar',
+             'chlorides', 'free sulfur dioxide', 'total sulfur dioxide', 'density',
+             'pH', 'sulphates', 'alcohol']
+
+# Keep only columns that still exist
+available_X = [col for col in X_columns if col in df.columns]
+X = df[available_X]
+Y = df['quality']
+
+print(f"X shape: {X.shape}")
+print(f"Y shape: {Y.shape}")
+print(f"X columns: {available_X}")
+
+# ============================================================
+# Q10: SelectKBest with chi2 (k=5)
+# ============================================================
+print("\n" + "="*50)
+print("Q10: SelectKBest (chi2, k=5)")
+print("="*50)
+
+from sklearn.feature_selection import SelectKBest, chi2
+
+# Ensure non-negative for chi2
+X_pos = X - X.min() + 0.001
+selector = SelectKBest(score_func=chi2, k=5)
+X_selected = selector.fit_transform(X_pos, Y)
+selected_mask = selector.get_support()
+selected_features = X.columns[selected_mask].tolist()
+
+print(f"Selected features: {selected_features}")
+
+# ============================================================
+# Q11: Mutual Information Score
+# ============================================================
+print("\n" + "="*50)
+print("Q11: Mutual Information Scores")
+print("="*50)
+
+from sklearn.feature_selection import mutual_info_regression
+
+mi_scores = mutual_info_regression(X, Y)
+mi_df = pd.DataFrame({'feature': X.columns, 'mi_score': mi_scores})
+mi_df = mi_df.sort_values('mi_score', ascending=False)
+
+print(mi_df)
+print(f"\nHighest MI: {mi_df.iloc[0]['feature']} = {mi_df.iloc[0]['mi_score']:.4f}")
+
+# ============================================================
+# Q12: PCA from scratch (first 2 components)
+# ============================================================
+print("\n" + "="*50)
+print("Q12: PCA from Scratch")
+print("="*50)
+
+# Standardize
+X_std = (X - X.mean()) / X.std()
+
+# Covariance matrix
+cov_matrix = np.cov(X_std.T)
+
+# Eigenvalues and eigenvectors
+eigenvals, eigenvecs = np.linalg.eig(cov_matrix)
+
+# Sort
+idx = eigenvals.argsort()[::-1]
+eigenvals = eigenvals[idx]
+eigenvecs = eigenvecs[:, idx]
+
+# First 2 components
+pca_result = X_std.dot(eigenvecs[:, :2])
+
+print(f"PCA result shape: {pca_result.shape}")
+print(f"Variance explained: PC1={eigenvals[0]/sum(eigenvals)*100:.2f}%, PC2={eigenvals[1]/sum(eigenvals)*100:.2f}%")
+
+# ============================================================
+# Q13: LDA (using sklearn)
+# ============================================================
+print("\n" + "="*50)
+print("Q13: LDA")
+print("="*50)
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
+# For LDA, need a target with at least 2 classes
+# Using quality as target (discretized into 3 groups)
+Y_lda = pd.cut(Y, bins=3, labels=[0,1,2])
+
+lda = LDA(n_components=2)
+X_lda = lda.fit_transform(X, Y_lda)
+
+print(f"LDA result shape: {X_lda.shape}")
+
+# ============================================================
+# Q14: Image processing (Zelda.bmp)
+# ============================================================
+print("\n" + "="*50)
+print("Q14: Image Processing")
+print("="*50)
+
+from PIL import Image
+
+try:
+    img = Image.open('Zelda.bmp')
+    img_array = np.array(img)
+    
+    if len(img_array.shape) == 3:
+        pixel_mean = np.mean(img_array, axis=2)
+    else:
+        pixel_mean = img_array
+    
+    print(f"Image shape: {img_array.shape}")
+    print(f"Mean feature shape: {pixel_mean.shape}")
+    print(f"Mean value: {pixel_mean.mean():.2f}")
+    
+    # Display
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
+    plt.imshow(img)
+    plt.title('Original')
+    plt.axis('off')
+    plt.subplot(1,2,2)
+    plt.imshow(pixel_mean, cmap='gray')
+    plt.title('Pixel-wise Mean')
+    plt.axis('off')
+    plt.show()
+    
+except:
+    print("Zelda.bmp not found. Skipping image processing.")
+
+# ============================================================
+# SUMMARY
+# ============================================================
+print("\n" + "="*50)
+print("EXPERIMENT 2 SUMMARY")
+print("="*50)
+print(f"Original shape: {df.shape}")
+print(f"Final X shape: {X.shape}")
+print(f"Selected features (SelectKBest): {selected_features}")
+print(f"Best Mutual Information feature: {mi_df.iloc[0]['feature']}")
+print(f"PCA variance explained: {eigenvals[0]/sum(eigenvals)*100:.1f}%")
+print("="*50)
